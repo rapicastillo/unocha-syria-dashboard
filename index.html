@@ -1,0 +1,302 @@
+
+<html>
+<head>
+  <script type="text/javascript" src="http://code.jquery.com/jquery-1.5.2.min.js"></script>
+  <script src="jquery.csv-0.71.min.js"></script>
+  <script src="http://code.highcharts.com/highcharts.js"></script>
+  <script src="http://code.highcharts.com/modules/exporting.js"></script>
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/numeral.js/1.4.5/numeral.min.js"></script>
+ 
+  <style>
+	body
+	{
+		font-family: Verdana, sans-serif;
+	}
+	#people-in-need
+	{
+		float: left;
+	}
+	
+	#people-in-need .non-graph-area
+	{
+		background-color: #ddd;
+		font-family: sans-serif;
+		font-weight: bold;
+		height: 165px;
+		text-align: center;
+		color: #333333;
+	}
+	
+	#people-in-need .non-graph-area p{ margin: 0 }
+	#people-in-need .non-graph-area p.hero-item
+	{
+		font-size: 62px;
+		padding-top: 22px;
+	}
+	#people-in-need .non-graph-area p.sub-item
+	{
+		font-size: 12px;
+		padding-top: 5px;
+		font-weight: normal;
+	}
+	
+	#internally-displaced, #people-reached
+	{
+		float: left; 
+		margin-left: 10px;
+	}
+	
+	#people-in-need, #internally-displaced, #people-reached
+	{
+		width: 176px;
+		height: 240px;
+	}
+	h1
+	{
+		font-family: sans-serif;
+		color: #016BB5;
+		margin: 0;
+		padding: 0;
+		font-size: 24px;
+	}
+	.title-area
+	{
+		position: relative;
+		background: #EEEEEE;
+		padding: 5px;
+	}
+	.title-area h1 { text-transform: uppercase; }
+	.title-area img 
+	{
+		width: 45px;
+	}
+	h3
+	{
+		margin: 0;
+		padding: 0;
+		font-family: sans-serif;
+		letter-spacing: .01;
+		font-size: 11px;
+		color: #333;
+	}
+	.section-icon
+	{
+		position: absolute;
+		top:5px;
+		right: 5px;
+	}
+  </style>
+  
+  <script>
+  $(function() 
+	{
+	var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+	var csv_object;
+	$.get("../csv-grab.php",
+		{
+                //u: "https://docs.google.com/spreadsheet/pub?key=0AgVVZWe9NC8wdG54cXpOM2hCS2RiS0xvNlE1MkI4SHc&output=csv", 
+		u: "https://docs.google.com/spreadsheet/pub?key=0AgVVZWe9NC8wdDNfOHUyQlB6VWlFWWZhRGFNQW9zV3c&output=csv"
+		},
+		function (data)
+		{		
+			var $csv = $.csv.toObjects(data);
+			
+			csv_object = $csv;
+			
+			csv_temp = {};
+			$($csv).each(function(i, item) {
+			
+				var id;
+				/* Establish IDs */
+				for( x in item ) 
+				{
+					if (x == "id")
+					{
+						id = item[x];
+						csv_temp[id] = {};
+						csv_temp[id]["raw"] = item;
+					}
+					
+					break;
+				}
+				
+				for ( y in csv_temp[id]["raw"] )
+				{
+					if ( y == "id" )
+					{
+						continue;
+					}
+					if (y == "type" || y == "title")
+					{
+						csv_temp[id][y] = csv_temp[id]["raw"][y];
+					}
+					else //date
+					{
+						if (! csv_temp[id]["date"] )
+						{
+							csv_temp[id]["date"] = {};
+						}
+						csv_temp[id]["date"][Date.parse(y)] = parseInt(csv_temp[id]["raw"][y]);
+					}
+				}
+			});
+			
+			csv_object = csv_temp;
+
+			
+			var internally_displaced_data = [];
+			for (x in csv_temp['intern-disp-0']['date'])
+			{
+				if (csv_temp['intern-disp-0']['date'][x])
+				{
+					internally_displaced_data.push([parseInt(x), csv_temp['intern-disp-0']['date'][x]]);
+				}
+			}
+
+			var idp_numeral = numeral(internally_displaced_data[internally_displaced_data.length - 1][1]).format('0.00a');
+			$("#internally-displaced .title-area h1").text(idp_numeral.toUpperCase());
+			$("#internally-displaced .title-area h3").html(csv_temp['intern-disp-0']['title']);
+			build_chart('#internally-displaced .highchard-item', internally_displaced_data, "Internally Displaced");
+			
+			/* BUILD  DATA FOR THE PEOPLE REACHED */
+			var people_reached_data = [];
+			for (x in csv_temp['reached-0']['date'])
+			{
+				if (csv_temp['reached-0']['date'][x])
+				{
+					people_reached_data.push([parseInt(x), csv_temp['reached-0']['date'][x]]);
+				}
+			}
+
+			var pr_numeral = numeral(people_reached_data[people_reached_data.length - 1][1]).format('0.0a');
+			$("#people-reached .title-area h1").text(pr_numeral.toUpperCase());
+			$("#people-reached .title-area h3").html(csv_temp['reached-0']['title']);
+
+			build_chart('#people-reached .highchard-item', people_reached_data, "People who've fled");
+
+			var in_need = [];
+			for (x in csv_temp['need-0']['date'])
+			{
+				if (csv_temp['need-0']['date'][x])
+				{
+					in_need.push([parseInt(x), csv_temp['need-0']['date'][x]]);
+				}
+			}
+
+			var latest_pair = in_need[in_need.length - 1];
+			var current = new Date(latest_pair[0] + 22400000);
+
+			var mon_str = MONTHS[current.getMonth()] + " " + current.getFullYear();
+			//console.log(mon_str);
+			//$("#people-in-need .title-area h1").text(mon_str);
+			$("#people-in-need .title-area h3").html(csv_temp['need-0']['title']);
+			//$("#people-in-need .non-graph-area .hero-item").text(numeral(latest_pair[1]).format('0.0a').toUpperCase());
+			
+			build_chart('#people-in-need .highchard-item', in_need, "People in need");
+			var st_numeral = numeral(in_need[in_need.length - 1][1]).format('0.0a');
+			$("#people-in-need .title-area h1").text(st_numeral);
+
+			$("#latest-month-area").text(mon_str);
+		}
+	);
+	
+	
+	
+	function build_chart(selector, data_x, y_label)
+		{
+			$(selector).highcharts({
+				exporting: { enabled: false }, 
+				chart: {
+					type: 'line', 
+					height: '165',
+					width: '176',
+					backgroundColor: "#DDDDDD"
+				},
+				title: {
+					text: '',
+					style: {
+						fontSize: '14px'
+					}
+				},
+				subtitle: {
+					text: ''
+				},
+				xAxis: {
+					type: 'datetime',
+					labels: {
+						style: 
+						{
+						  fontSize: "8px"
+						}
+					}
+				},
+				yAxis: {
+					title: {
+						text: ''
+					},
+					labels: {
+						style: {
+						  fontSize: '8px'
+						}
+					}
+				},
+				legend: {
+					enabled: false
+				},
+				tooltip: {
+					formatter: function() {
+						return '<b>'+ Highcharts.dateFormat('%b %Y', this.x) +'</b><br/>'+
+							y_label + ': '+ Highcharts.numberFormat(this.y, 0) ;
+					},
+					style: {
+						fontSize: '10px'
+					}
+				},
+				
+				series: [{
+					data: data_x
+				}]
+			});
+		}
+  });
+  </script>
+</head>
+<body>
+  <div id="people-in-need">
+	<div class="title-area">
+		<h1></h1>
+		<h3></h3>
+		<img src="people-affected.png" class="section-icon"/>
+	</div>
+	<div class="highchard-item"></div>
+	<!-- div class="non-graph-area">
+		<p class="hero-item"></p>
+		<p class="sub-item"></p>
+	</div -->
+  </div>
+  
+  <div id="people-reached">
+ 	<div class="title-area">
+		<h1></h1>
+		<h3></h3>
+		<img src="people-reached.png" class="section-icon"/>
+	</div>
+	<div class="highchard-item"></div>
+  </div>
+  
+  <div id="internally-displaced">
+	<div class="title-area">
+		<h1></h1>
+		<h3></h3>
+		<img src="internally-displaced.png" class="section-icon"/>
+	</div>
+	<div class="highchard-item"></div>
+  </div>
+  <div style="clear: both;"></div>
+  <div id="legend-area">
+    <span style="font-size:10px;"><span>Data source: OCHA (as of <span id="latest-month-area"></span>).</span> <em><span style="float: right">*Mouseover the chart to visualize data</span></em></span>
+  </div>
+
+</body>
+</html>
+
